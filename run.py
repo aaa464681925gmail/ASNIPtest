@@ -33,6 +33,10 @@ CF_SCANNER = BASE / "cf-scanner"
 VERIFY_PY  = BASE / "verify.py"
 API_URL    = "https://api.090227.xyz/check"
 
+# 确保 cf-scanner 有执行权限 (git clone 不保留 +x)
+if CF_SCANNER.is_file():
+    CF_SCANNER.chmod(0o755)
+
 # ── Step 1: ASN → CIDR ──
 def fetch_prefixes(asns):
     cidrs = []
@@ -111,6 +115,8 @@ def cf_scan():
         print("  无开放端口，跳过")
         return 0
 
+    if not os.access(CF_SCANNER, os.X_OK):
+        os.chmod(CF_SCANNER, 0o755)
     subprocess.run([str(CF_SCANNER), "-i", str(new_file), "-o", str(hits_file), "-c", str(CF_SCANNER_CONC)], check=True)
     hits = sum(1 for _ in open(hits_file))
     print(f"  CF 节点: {hits}")
