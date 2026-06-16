@@ -140,12 +140,11 @@ info "cf-scanner 编译完成 → $PROJECT_DIR/cf-scanner"
 
 # ── 5. 完成 ──
 echo ""
-echo -e "${GREEN}${BOLD}✅ 安装完成！${NC}"
+echo -e "${GREEN}${BOLD}✅ 安装完成，开始运行${NC}"
 echo ""
 echo -e "  ${CYAN}项目目录:${NC} $PROJECT_DIR"
-echo -e "  ${CYAN}编辑端口:${NC} vim $PROJECT_DIR/ports.txt"
-echo -e "  ${CYAN}运行扫描:${NC}  cd $PROJECT_DIR && python3 run.py AS209242"
-echo ""
 echo -e "  ${CYAN}更新:${NC} bash $PROJECT_DIR/install.sh update"
 echo -e "  ${CYAN}卸载:${NC} bash $PROJECT_DIR/install.sh uninstall"
 echo ""
+
+exec python3 "$PROJECT_DIR/run.py"
