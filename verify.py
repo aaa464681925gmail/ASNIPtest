@@ -7,15 +7,14 @@ import argparse, urllib.request, json, time, sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def check_single(line):
-    """Check single IP:port, return cfnb-format result or None"""
+    """Check single IP:port via CF proxy probe, return cfnb-format result or None"""
     line = line.strip()
     if not line or line.startswith("#"):
         return None
     parts = line.split()
     ip_port = parts[0] if parts else line
-    ip, port = ip_port.rsplit(":", 1)
     try:
-        url = f"https://api.090227.xyz/check?ip={ip}&port={port}"
+        url = f"https://api.090227.xyz/check?proxyip={ip_port}"
         headers = {
             "User-Agent": "Mozilla/5.0",
             "Accept": "application/json",
@@ -24,13 +23,17 @@ def check_single(line):
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-            # API returns: ip, colo, asn, asOrganization, country, region, ...
-            colo = data.get("colo", "")
-            country = data.get("country", "")
-            asn = data.get("asn", "")
-            org = data.get("asOrganization", "")
-            region = data.get("region", "")
+            if not data.get("success"):
+                return None
+            # Get actual CF exit info from probe_results
+            pr = data.get("probe_results", {})
+            exit_info = pr.get("ipv4", {}).get("exit") or pr.get("ipv6", {}).get("exit") or {}
+            colo = exit_info.get("colo", data.get("colo", ""))
+            country = exit_info.get("country", "")
+            region = exit_info.get("region", "")
+            asn = exit_info.get("asn", data.get("asn", ""))
             # cfnb format: IP地址,端口,TLS,数据中心,地区,城市,网络延迟,下载速度,ASN
+            ip, port = ip_port.rsplit(":", 1)
             return f"{ip},{port},TRUE,{colo},{country},{region},,,AS{asn}"
     except Exception:
         pass
