@@ -31,7 +31,7 @@ REPO_URL="https://github.com/e13815332/ASNIPtest.git"
 # ── 卸载 ──
 do_uninstall() {
     echo ""
-    for d in "$PROJECT_DIR" "$HOME/cf-ip-scanner" "$HOME/cf-ip-scanner.tmp"; do
+    for d in "$PROJECT_DIR" "$HOME/cf-ip-scanner.tmp"; do
         if [ -d "$d" ]; then
             rm -rf "$d"
             info "已删除 $d"
@@ -75,10 +75,10 @@ do_install() {
     fi
     [ "$(id -u)" = "0" ] && SUDO="" || SUDO="sudo"
 
-    # 清理旧版本
-    for d in "$HOME/cf-ip-scanner" "$HOME/cf-ip-scanner.tmp"; do
+    # 清理旧版本临时目录
+    for d in "$HOME/cf-ip-scanner.tmp" "$PROJECT_DIR.tmp"; do
         if [ -d "$d" ]; then
-            warn "清理旧版本: $d"
+            warn "清理旧缓存: $d"
             rm -rf "$d"
         fi
     done
