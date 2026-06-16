@@ -78,7 +78,9 @@ def run_masscan():
     result_file = BASE / "masscan_result.txt"
     ip_file = BASE / "ips.txt"
 
-    cmd = [
+    # masscan 需要 root 权限
+    sudo = [] if os.geteuid() == 0 else ["sudo"]
+    cmd = sudo + [
         "masscan", "-iL", str(ip_file),
         "-p", ports,
         "--rate", str(MASSCAN_RATE),
