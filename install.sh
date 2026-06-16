@@ -124,9 +124,21 @@ do_install() {
 
     # 克隆
     if [ -d "$PROJECT_DIR/.git" ]; then
-        info "项目已存在，更新中..."
-        cd "$PROJECT_DIR"
-        git pull origin main --ff-only
+        # 验证是否合法安装
+        if [ -f "$PROJECT_DIR/VERSION" ] && [ -f "$PROJECT_DIR/run.py" ]; then
+            info "项目已存在 ($(cat "$PROJECT_DIR/VERSION"))，更新中..."
+            cd "$PROJECT_DIR"
+            git pull origin main --ff-only
+        else
+            warn "检测到旧版/损坏安装，重新安装..."
+            rm -rf "$PROJECT_DIR"
+            git clone --depth 1 --branch main "$REPO_URL" "$PROJECT_DIR"
+        fi
+    elif [ -d "$PROJECT_DIR" ]; then
+        warn "检测到旧版残留，清理..."
+        rm -rf "$PROJECT_DIR"
+        info "克隆项目..."
+        git clone --depth 1 --branch main "$REPO_URL" "$PROJECT_DIR"
     else
         info "克隆项目..."
         git clone --depth 1 --branch main "$REPO_URL" "$PROJECT_DIR"
