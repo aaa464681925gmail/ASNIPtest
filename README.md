@@ -8,6 +8,18 @@
 curl -fsSL https://raw.githubusercontent.com/e13815332/ASNIPtest/main/install.sh | bash
 ```
 
+## Windows 用户（Docker）
+
+Windows 上安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)，然后一行命令跑起来：
+
+```powershell
+docker run -it --rm --cap-add=NET_RAW ghcr.io/e13815332/asniptest
+```
+
+> `--cap-add=NET_RAW` 是 masscan 发 SYN 包必须的权限。
+>
+> 如果 GHCR 拉不动，自己构建：`docker build -t asniptest . && docker run -it --rm --cap-add=NET_RAW asniptest`
+
 ## 卸载
 
 ```bash
