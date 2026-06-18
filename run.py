@@ -152,6 +152,13 @@ def run_masscan():
     result_file = BASE / "masscan_result.txt"
     ip_file = BASE / "ips.txt"
 
+    # 清理上次残留（可能 root 所有，普通用户改不了 → sudo rm）
+    if result_file.exists():
+        if os.geteuid() == 0:
+            result_file.unlink()
+        else:
+            subprocess.run(["sudo", "rm", "-f", str(result_file)], check=False)
+
     # masscan 需要 root 权限
     sudo = [] if os.geteuid() == 0 else ["sudo"]
     cmd = sudo + [
@@ -162,6 +169,12 @@ def run_masscan():
         "--wait", "5"
     ]
     subprocess.run(cmd, check=True)
+
+    # sudo 创建的文件归 root → chown 回当前用户
+    if os.geteuid() != 0:
+        uid = os.getuid()
+        gid = os.getgid()
+        subprocess.run(["sudo", "chown", f"{uid}:{gid}", str(result_file)], check=False)
 
     # 转换为 IP:port
     lines = []
