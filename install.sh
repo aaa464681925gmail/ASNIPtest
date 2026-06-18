@@ -11,7 +11,7 @@ set -euo pipefail
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[0;33m'; NC='\033[0m'
 BOLD='\033[1m'
 
-VERSION="v1.0.13"
+VERSION="v1.0.14"
 
 logo() {
     echo -e "${CYAN}${BOLD}"
@@ -106,6 +106,7 @@ do_install() {
     install_pkg masscan
     install_pkg libpcap-dev
     install_pkg prips
+    install_pkg dnsutils
     install_pkg python3
     install_pkg git
 

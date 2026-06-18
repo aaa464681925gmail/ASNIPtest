@@ -31,10 +31,13 @@ print(f"  硬件: {CPU_CORES}核 {RAM_MB}MB → masscan {MASSCAN_RATE}pps cf-sca
 
 # ── 获取公网 IP (NAT/Docker 环境兼容) ──
 def get_public_ip():
-    """获取公网出口 IP，支持两个 API 互为备用；Docker/NAT 回退到宿主机网关"""
+    """获取公网出口 IP，HTTP API → DNS 多重兜底，局域网也能正确获取"""
+    # ── HTTP API（首选，速度快） ──
     apis = [
-        ("https://api.ipify.org", 5),       # 国际，速度快
-        ("https://api-ipv4.ip.sb/ip", 5),   # 国内可用，仅 IPv4
+        ("https://api.ipify.org", 5),          # 国际
+        ("https://api-ipv4.ip.sb/ip", 5),      # 国内可用
+        ("https://ifconfig.me/ip", 5),          # 备用
+        ("https://icanhazip.com", 5),           # 备用
     ]
     for url, timeout in apis:
         try:
@@ -42,17 +45,23 @@ def get_public_ip():
         except Exception:
             continue
 
-    # Docker/NAT 环境: 尝试从路由表拿宿主机网关 IP
-    try:
-        r = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True, timeout=3)
-        for token in r.stdout.strip().split():
-            if "." in token and token.count(".") == 3:
-                # 验证格式: x.x.x.x
-                parts = token.split(".")
+    # ── DNS 方式（不依赖 HTTP，局域网 NAT 后也能正确获取公网出口 IP） ──
+    dns_queries = [
+        (["dig", "+short", "myip.opendns.com", "@resolver1.opendns.com"], 5),
+        (["dig", "TXT", "+short", "o-o.myaddr.l.google.com", "@ns1.google.com"], 5),
+        (["dig", "+short", "whoami.akamai.net", "@ns1-1.akamaitech.net"], 5),
+    ]
+    for cmd, timeout in dns_queries:
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            out = r.stdout.strip().strip('"')
+            if out and "." in out and out.count(".") == 3:
+                parts = out.split(".")
                 if all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
-                    return token
-    except Exception:
-        pass
+                    return out
+        except Exception:
+            continue
+
     return "127.0.0.1"
 
 # ── 公网 IP + 运营商检测 ──
@@ -61,7 +70,7 @@ def detect_isp():
     ip = get_public_ip()
     print(f"\n  本机公网 IP: {ip}")
     if ip == "127.0.0.1":
-        print("  (Docker/NAT 环境，无法获取公网 IP，跳过运营商检测)")
+        print("  (无法获取公网 IP，请检查网络连接，跳过运营商检测)")
         return ip, "", ""
     try:
         token = None
