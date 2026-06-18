@@ -26,7 +26,6 @@
 **Linux / macOS**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/e13815332/ASNIPtest/main/install.sh | bash
-cmtjd
 ```
 
 **Windows**（需先装 WSL2）
@@ -36,7 +35,6 @@ wsl --install
 
 # 重启后进 Ubuntu 终端
 curl -fsSL https://raw.githubusercontent.com/e13815332/ASNIPtest/main/install.sh | bash
-cmtjd
 ```
 
 ---
