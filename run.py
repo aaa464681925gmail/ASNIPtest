@@ -342,12 +342,16 @@ def output_csv(asns):
 
     print(f"\n  结果: {len(lines)} 条 → {output.name}")
 
-    # ── 提供下载链接（局域网 IP，不用出口 IP） ──
+    # ── 提供下载链接（局域网 + 公网双链接） ──
     try:
-        ip = get_lan_ip()
+        lan_ip = get_lan_ip()
         port = 8899
         print(f"\n  📥 下载链接 (临时, 按回车关闭):")
-        print(f"  http://{ip}:{port}/{output.name}")
+        print(f"  http://{lan_ip}:{port}/{output.name}  (本机)")
+        # 如果公网 IP 和局域网不同，也显示公网
+        public_ip = get_public_ip()
+        if public_ip != "127.0.0.1" and public_ip != lan_ip:
+            print(f"  http://{public_ip}:{port}/{output.name}  (公网)")
         print()
         server = subprocess.Popen(
             ["python3", "-m", "http.server", str(port), "--directory", str(BASE)],
