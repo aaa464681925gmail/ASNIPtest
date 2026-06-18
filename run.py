@@ -31,7 +31,7 @@ print(f"  硬件: {CPU_CORES}核 {RAM_MB}MB → masscan {MASSCAN_RATE}pps cf-sca
 
 # ── 获取公网 IP (NAT/Docker 环境兼容) ──
 def get_public_ip():
-    """获取公网出口 IP，支持两个 API 互为备用"""
+    """获取公网出口 IP，支持两个 API 互为备用；Docker/NAT 回退到宿主机网关"""
     apis = [
         ("https://api.ipify.org", 5),       # 国际，速度快
         ("https://api-ipv4.ip.sb/ip", 5),   # 国内可用，仅 IPv4
@@ -41,6 +41,18 @@ def get_public_ip():
             return urllib.request.urlopen(url, timeout=timeout).read().decode("utf-8").strip()
         except Exception:
             continue
+
+    # Docker/NAT 环境: 尝试从路由表拿宿主机网关 IP
+    try:
+        r = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True, timeout=3)
+        for token in r.stdout.strip().split():
+            if "." in token and token.count(".") == 3:
+                # 验证格式: x.x.x.x
+                parts = token.split(".")
+                if all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+                    return token
+    except Exception:
+        pass
     return "127.0.0.1"
 
 # ── 公网 IP + 运营商检测 ──
@@ -48,6 +60,9 @@ def detect_isp():
     """检测本机公网 IP 及运营商，返回 (ip, country, isp_name)"""
     ip = get_public_ip()
     print(f"\n  本机公网 IP: {ip}")
+    if ip == "127.0.0.1":
+        print("  (Docker/NAT 环境，无法获取公网 IP，跳过运营商检测)")
+        return ip, "", ""
     try:
         token = None
         token_file = Path("/root/.ipinfo_token")
