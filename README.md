@@ -86,9 +86,12 @@ curl -fsSL https://raw.githubusercontent.com/e13815332/ASNIPtest/main/install.sh
 直接指定 ASN 编号启动扫描：
 
 ```bash
-cmtjd AS209242            # 单个 ASN
-cmtjd AS209242,AS3214     # 多个 ASN（逗号分隔）
-cmtjd AS209242 AS3214     # 多个 ASN（空格分隔）
+cmtjd AS209242                 # 单个 ASN，默认端口
+cmtjd AS209242,AS3214          # 多个 ASN（逗号分隔）
+cmtjd AS209242 AS3214          # 多个 ASN（空格分隔）
+cmtjd AS209242 -p 443          # 单端口
+cmtjd AS209242 -p 8443-8550    # 端口范围
+cmtjd AS209242 -p 443,8443,2053-2096  # 混合
 ```
 
 > 手动运行时用 `python3 run.py` 代替 `cmtjd`。
@@ -108,6 +111,9 @@ cmtjd
   地区: Tokyo, JP  运营商: xxx
 
   输入 ASN 编号 (多个用逗号分隔): _
+
+  默认端口: 443,8443,2053,2083,2087,2096
+  回车使用默认，或输入自定义端口 (如 443 或 8443-8550): _
 ```
 
 输入 ASN 后自动开始扫描。API 精筛完成后询问是否测速，用户选择后输出 CSV 下载链接。
