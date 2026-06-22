@@ -12,7 +12,7 @@ import json
 import shutil
 from pathlib import Path
 
-BASE = Path(__file__).parent.resolve()
+BASE = Path(__file__).resolve().parent
 VERSION_FILE = BASE / "VERSION"
 
 # ── 导入模块级常量 ──
@@ -57,7 +57,7 @@ def parse_ports(port_str):
 
 # ── Step 1: ASN → CIDR ──
 def fetch_prefixes(asns):
-    """仅支持从 RIPEStat API 获取前缀"""
+    """仅支持从 RIPEStat API 获取前缀，自动重试超时"""
     from urllib.request import urlopen, Request
     from urllib.error import URLError
     import time
@@ -72,16 +72,28 @@ def fetch_prefixes(asns):
     for asn in sorted(asn_set, key=int):
         url = f"https://stat.ripe.net/data/announced-prefixes/data.json?resource=AS{asn}"
         req = Request(url, headers=headers)
-        try:
-            resp = urlopen(req, timeout=15)
-            data = json.loads(resp.read())
-            prefixes = data.get("data", {}).get("prefixes", [])
-        except (URLError, json.JSONDecodeError, KeyError) as e:
-            print(f"  ⚠ AS{asn} 查询失败: {e}")
+        # 重试最多 3 次
+        data = None
+        for attempt in range(3):
+            try:
+                resp = urlopen(req, timeout=15)
+                data = json.loads(resp.read())
+                break
+            except URLError as e:
+                if attempt < 2:
+                    wait = (attempt + 1) * 2
+                    print(f"  ⚠ AS{asn} 超时 (重试 {attempt+1}/3, {wait}s)...")
+                    time.sleep(wait)
+                else:
+                    print(f"  ⚠ AS{asn} 查询失败: {e}")
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"  ⚠ AS{asn} 数据异常: {e}")
+                break
+        if data is None:
             continue
 
+        prefixes = data.get("data", {}).get("prefixes", [])
         v4 = [p["prefix"] for p in prefixes if ":" not in p.get("prefix", "")]
-        v6 = [p["prefix"] for p in prefixes if ":" in p.get("prefix", "")]
         cidrs = v4  # 仅 IPv4
 
         if not cidrs:
@@ -93,6 +105,13 @@ def fetch_prefixes(asns):
                 seen.add(c)
                 total += 1
         time.sleep(0.3)  # RIPEStat 限速
+
+    if total == 0:
+        if cidr_file.exists() and cidr_file.stat().st_size > 0:
+            print("  ⚠ 未获取到新 CIDR，保留上次缓存")
+            return
+        print("  ⚠ 无 CIDR 数据，跳过")
+        return
 
     cidr_file.write_text("\n".join(sorted(seen, key=lambda x: (
         int(x.split("/")[0].split(".")[0]),
@@ -339,6 +358,33 @@ def output_csv(asns):
 # ── 主入口 ──
 if __name__ == "__main__":
 
+    # ── 子命令: log / result ──
+    if len(sys.argv) >= 2 and sys.argv[1] == "log":
+        logs = sorted(BASE.glob("scan_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not logs:
+            print("  ⚠ 无挂机日志")
+            sys.exit(0)
+        import subprocess as sp
+        sp.run(["tail", "-f", str(logs[0])])
+        sys.exit(0)
+
+    if len(sys.argv) >= 2 and sys.argv[1] == "result":
+        csvs = sorted(BASE.glob("output_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not csvs:
+            print("  ⚠ 无结果文件")
+            sys.exit(0)
+        latest = csvs[0]
+        lines = latest.read_text().strip().splitlines()
+        print(f"  文件: {latest.name}")
+        print(f"  行数: {len(lines) - 1}")
+        print("  ---")
+        for line in lines[:15]:
+            print(f"  {line}")
+        if len(lines) > 15:
+            print(f"  ... 还有 {len(lines)-15} 行")
+        print(f"\n  下载: cat {latest}")
+        sys.exit(0)
+
     BG_MODE = "--bg" in sys.argv
 
     # ── 解析 ASN ──
@@ -420,16 +466,24 @@ if __name__ == "__main__":
         except (EOFError, KeyboardInterrupt):
             bg_choice = ""
         if bg_choice == "y":
+            from datetime import datetime
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            asn_tag = "_".join(f"AS{a}" for a in asns)
+            log_file = BASE / f"scan_{asn_tag}_{ts}.log"
             bg_cmd = [sys.executable, __file__, "--bg"] + [f"AS{a}" for a in asns]
             if scan_ports != DEFAULT_PORTS:
                 bg_cmd += ["-p", scan_ports]
             if do_speed:
                 bg_cmd.append("--speed")
+            with open(log_file, "w") as lf:
+                lf.write(f"cmd: {' '.join(bg_cmd)}\n")
+                lf.write(f"time: {ts}\n\n")
             print(f"  ↪ {' '.join(bg_cmd)}")
-            subprocess.Popen(bg_cmd, stdin=subprocess.DEVNULL,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             start_new_session=True)
-            print(f"  ✅ 已挂机\n")
+            with open(log_file, "a") as lf:
+                subprocess.Popen(bg_cmd, stdin=subprocess.DEVNULL,
+                                 stdout=lf, stderr=lf,
+                                 start_new_session=True)
+            print(f"  ✅ 已挂机 → {log_file.name}\n")
             sys.exit(0)
 
     # ── BG_MODE 跳过测速（stdin 已关闭）──
