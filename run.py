@@ -400,24 +400,7 @@ if __name__ == "__main__":
                 print(f"  自定义端口: {scan_ports}")
                 break
 
-    # ── 交互模式挂机询问 ──
-    if not BG_MODE and len(sys.argv) < 2:
-        try:
-            bg_choice = input("  挂机运行？(y/n，默认n): ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            bg_choice = ""
-        if bg_choice == "y":
-            bg_cmd = [sys.executable, __file__, "--bg"] + [f"AS{a}" for a in asns]
-            if scan_ports != DEFAULT_PORTS:
-                bg_cmd += ["-p", scan_ports]
-            print(f"  ↪ {' '.join(bg_cmd)}")
-            subprocess.Popen(bg_cmd, stdin=subprocess.DEVNULL,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                             start_new_session=True)
-            print(f"  ✅ 已挂机\n")
-            sys.exit(0)
-
-    # ── 测速询问（提前，在开始扫描前决定） ──
+    # ── 测速询问（先问，影响挂机参数） ──
     do_speed = False
     if not BG_MODE:
         try:
@@ -429,8 +412,29 @@ if __name__ == "__main__":
             print("  ✓ 完成后自动测速\n")
         else:
             print("  跳过测速\n")
-    else:
-        print("  跳过测速（挂机模式）\n")
+
+    # ── 交互模式挂机询问 ──
+    if not BG_MODE and len(sys.argv) < 2:
+        try:
+            bg_choice = input("  挂机运行？(y/n，默认n): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            bg_choice = ""
+        if bg_choice == "y":
+            bg_cmd = [sys.executable, __file__, "--bg"] + [f"AS{a}" for a in asns]
+            if scan_ports != DEFAULT_PORTS:
+                bg_cmd += ["-p", scan_ports]
+            if do_speed:
+                bg_cmd.append("--speed")
+            print(f"  ↪ {' '.join(bg_cmd)}")
+            subprocess.Popen(bg_cmd, stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True)
+            print(f"  ✅ 已挂机\n")
+            sys.exit(0)
+
+    # ── BG_MODE 跳过测速（stdin 已关闭）──
+    if BG_MODE:
+        do_speed = "--speed" in sys.argv
 
     # ── 构建步骤 ──
     steps = [
