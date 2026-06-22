@@ -201,6 +201,20 @@ PROJECT_DIR="$HOME/ASNIPtest"
 case "${1:-}" in
     update)    exec bash "$PROJECT_DIR/install.sh" update ;;
     uninstall) exec bash "$PROJECT_DIR/install.sh" uninstall ;;
+    log)       shift; LOG=$(ls -t "$PROJECT_DIR"/scan_*.log 2>/dev/null | head -1)
+               if [ -z "$LOG" ]; then echo "暂无日志"; exit 0; fi
+               echo "日志: $LOG"; exec tail -f "$LOG" "$@" ;;
+    result)    CSV=$(ls -t "$PROJECT_DIR"/output_*.csv 2>/dev/null | head -1)
+               if [ -z "$CSV" ]; then echo "暂无结果"; exit 0; fi
+               echo "文件: $CSV"
+               echo "行数: $(wc -l < "$CSV" | tr -d ' ')"
+               echo "---"
+               head -20 "$CSV" | column -t -s','
+               [ "$(wc -l < "$CSV")" -gt 20 ] && echo "... (还有更多行)"
+               echo "---"
+               echo "下载: cat $CSV"
+               echo "      scp user@host:${CSV} ."
+               echo "      head -5 $CSV  # 只看前几行" ;;
     "")        exec python3 "$PROJECT_DIR/run.py" ;;
     *)         exec python3 "$PROJECT_DIR/run.py" "$@" ;;
 esac
@@ -208,8 +222,11 @@ WRAPEOF
     $SUDO mv "/tmp/cmtjd_wrapper" "$WRAPPER"
     $SUDO chmod +x "$WRAPPER"
     info "快捷命令已就绪: cmtjd                   (输入 ASN 扫描)"
-    info "                  cmtjd update            (更新)"
-    info "                  cmtjd uninstall         (卸载)"
+    info "                  cmtjd --bg AS12345    (挂机模式)"
+    info "                  cmtjd log             (查看最新日志)"
+    info "                  cmtjd result          (查看最新结果)"
+    info "                  cmtjd update          (更新)"
+    info "                  cmtjd uninstall       (卸载)"
 
     echo ""
     echo -e "${GREEN}${BOLD}✅ 安装完成，开始运行${NC}"
