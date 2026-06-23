@@ -332,18 +332,20 @@ def run_masscan(ports_str=None):
         gid = os.getgid()
         subprocess.run(["sudo", "chown", f"{uid}:{gid}", str(result_file)], check=False)
 
-    # 转换为 IP:port
-    lines = []
-    with open(result_file) as f:
-        for line in f:
+    # 转换为 IP:port (流式写入，不在内存全量加载)
+    total = 0
+    tmp_file = result_file.with_suffix(".tmp")
+    with open(result_file) as src, open(tmp_file, "w") as dst:
+        for line in src:
             if line.startswith("#") or not line.strip():
                 continue
             parts = line.strip().split()
             if len(parts) >= 4 and parts[0] == "open":
-                lines.append(f"{parts[3]}:{parts[2]}")
-    result_file.write_text("\n".join(lines) + "\n")
-    print(f"  开放端口: {len(lines)}")
-    return len(lines)
+                dst.write(f"{parts[3]}:{parts[2]}\n")
+                total += 1
+    tmp_file.replace(result_file)
+    print(f"  开放端口: {total}")
+    return total
 
 # ── Step 4: cf-scanner 粗筛 ──
 def cf_scan():

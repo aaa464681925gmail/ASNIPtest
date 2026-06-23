@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"io"
+	"runtime"
 	"os"
 	"strings"
 	"sync"
@@ -46,7 +48,7 @@ func isCloudflareProxy(ip string, client *http.Client) (bool, string, string) {
 	if err != nil {
 		return false, "", target
 	}
-	defer resp.Body.Close()
+	defer func() { io.Copy(io.Discard, resp.Body); resp.Body.Close() }()
 
 	serverHeader := resp.Header.Get("Server")
 	cfRay := resp.Header.Get("CF-RAY")
@@ -156,8 +158,9 @@ func main() {
 		DialContext: (&net.Dialer{
 			Timeout: *connectTO,
 		}).DialContext,
-		MaxIdleConns:        0,
-		MaxIdleConnsPerHost: 0,
+		ForceAttemptHTTP2:	false,
+		MaxIdleConns:		*concurrency,
+		MaxIdleConnsPerHost:	1,
 		IdleConnTimeout:     1 * time.Second,
 		DisableKeepAlives:   true,
 	}
@@ -209,6 +212,21 @@ func main() {
 		}
 	}()
 
+
+	// Periodic GC to prevent memory accumulation
+	gcDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-gcDone:
+				return
+			case <-ticker.C:
+				runtime.GC()
+			}
+		}
+	}()
 	// Progress reporter
 	startTime := time.Now()
 	startSkip := int64(skip)
@@ -246,6 +264,7 @@ func main() {
 
 	wg.Wait()
 	close(results)
+	close(gcDone)
 	close(done)
 
 	os.WriteFile(*stateFile, []byte(fmt.Sprintf("%s	%d", *inputFile, total)), 0644)
